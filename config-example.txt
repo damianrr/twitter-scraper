@@ -4,9 +4,13 @@ wake_every: 2
 stop_words: resources/stopwords.txt
 
 [Stream]
-username: foo 
-password: foo    
+consumer_key: xxx
+consumer_secret: xxx
+access_token: xxx
+access_token_secret: xxx
 
 [FilterStream]
-username: foo    
-password: foo 
+consumer_key: xxx
+consumer_secret: xxx
+access_token: xxx
+access_token_secret: xxx

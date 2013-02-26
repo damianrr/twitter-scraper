@@ -3,12 +3,13 @@ import json
 import sys
 
 class Streamer(object):
-    def __init__(self, qid, agent, username, password, api=None):
-        self.api = api or tweepy.API()
+    def __init__(self, qid, agent, auth, api=None):
+        self.api = api or tweepy.API(auth)
         self.agent = agent
         self.qid = qid
         self.filter = []
-        self.stream = tweepy.Stream(username, password, self)
+        self.stream = tweepy.Stream(auth, self)
+
 
     def start(self, query=None):
         print "Stream %s starting" % self.qid
@@ -17,11 +18,11 @@ class Streamer(object):
             self.stream.sample(async=True)
         else:
             self.stream.filter(None, self.filter, async=True)
-        
+
     def stop(self):
         print "Stream %s stopping" % self.qid
         self.stream.disconnect()
-        
+
     def on_data(self, data):
         """Called when raw data is received from connection.
 
@@ -45,7 +46,7 @@ class Streamer(object):
             print "Unexpected error:", sys.exc_info()[0]
             print ex
             print ex.args
-            
+
     def on_status(self, status):
         """Called when a new status arrives"""
         self.agent.receive_tweet(status)
@@ -70,14 +71,14 @@ class Streamer(object):
         """Called when stream connection times out"""
         print "TIMEOUT"
         return
-        
+
 
 if __name__ == "__main__":
     class R:
         def receive_tweet(self, status):
             try:
                 print str(status['text'] + "\n")
-            except: 
+            except:
                 pass
     r = R()
     s = Streamer(0, r, 'foobar005', 'foobar')

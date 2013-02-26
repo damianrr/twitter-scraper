@@ -10,55 +10,62 @@ import ConfigParser, os
 from tasks import tasks
 import base64
 from english import English
+import tweepy
 
 class Agent:
     def __init__(self, config_file):
         config = ConfigParser.ConfigParser()
         config.readfp(open('config.txt'))
         self.db_name = config.get("Agent", "database")
-        self.db = database.Database(self.db_name) 
+        self.db = database.Database(self.db_name)
         self.wake_interval = int(config.get("Agent", "wake_every"))
         self.stopwords = open(config.get("Agent", "stop_words"), 'r').read().split()
         self.local_timezone = pytz.timezone ("America/New_York")
         self.woke_at = self.utc_for(datetime.datetime.now())
-        self.tasks = tasks.TaskTypes 
+        self.tasks = tasks.TaskTypes
         self.tweet_cache = []
-        self.streamSampler = Streamer(0,self,config.get("Stream", "username"),config.get("Stream", "password"))
-        self.filterSampler = Streamer(0,self,config.get("FilterStream", "username"),config.get("FilterStream", "password"))
+        streamauth = tweepy.OAuthHandler(config.get("Stream", "consumer_key"), config.get("Stream", "consumer_secret"))
+        streamauth.set_access_token(config.get("Stream", "access_token"), config.get("Stream", "access_token_secret"))
+        streamapi = tweepy.API(streamauth)
+        filterauth = tweepy.OAuthHandler(config.get("Stream", "consumer_key"), config.get("Stream", "consumer_secret"))
+        filterauth.set_access_token(config.get("Stream", "access_token"), config.get("Stream", "access_token_secret"))
+        filterapi = tweepy.API(filterauth)
+        self.streamSampler = Streamer(0, self, streamauth, streamapi)
+        self.filterSampler = Streamer(0, self, filterauth, filterapi)
         self.expire = False
         self.blackboard = {}
-    
+
     def utc_for(self, dt):
         local_dt = dt.replace (tzinfo = self.local_timezone)
-        return local_dt.astimezone(pytz.utc)        
-        
+        return local_dt.astimezone(pytz.utc)
+
     def wake(self):
         self.db = database.Database(self.db_name)
         try:
             self.woke_at = self.utc_for(datetime.datetime.now())
             self.process_tasks()
-            if not self.expire: 
+            if not self.expire:
                 threading.Timer(self.wake_interval, self.wake).start()
         except Exception as ex:
             print "Unexpected error:", sys.exc_info()[0]
-       	    print ex.args
-            print ex 
+            print ex.args
+            print ex
 
         self.db.commit()
         self.db.close()
         self.db = None
-            
+
     ###############################################################
     ## Blackbaord
     ## For tasks to store data in
-    ## 
+    ##
 
     def stash(self, key, obj):
-       self.blackboard[key] = obj    
-    
+       self.blackboard[key] = obj
+
     def fetch(self, key):
-       return self.blackboard[key] 
-    
+       return self.blackboard[key]
+
     ###############################################################
     ## Task Processing
     ## Ideally this would be nicely split out into separate code files
@@ -85,28 +92,28 @@ class Agent:
                 gotit = True
                 taskImpl = taskType(self, pickle.loads(base64.b64decode(task[5])))
                 taskImpl.tid = task[0]
-                taskImpl.delta = task[4] 
+                taskImpl.delta = task[4]
                 if task[3] == 1:
                     taskImpl.reschedules = True
                 else:
                     taskImpl.reschedules = False
-                    
+
                 taskImpl.execute()
                 taskImpl.complete()
         if not gotit:
             print "Unknown Task"
             print task
-    
+
     def receive_tweet(self, tweet):
         self.tweet_cache.append(tweet)
-    
+
     def save_tweets(self, tweet):
         tweets = self.tweet_cache
         self.tweet_cache = []
         print "[%s] Saving %d Tweets" % (str(datetime.datetime.now()), len(tweets))
         for tweet in tweets:
             self.db.save_tweet(tweet)
-    
+
 def main():
     agent = Agent("config.txt")
     # task = tasks.Task(agent.db)
@@ -115,5 +122,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-
